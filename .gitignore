@@ -1,0 +1,4 @@
+.env
+temp_test_files/
+dist/
+node_modules/
