@@ -3,8 +3,6 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "tsx test/generateBatchDeletePlanTest.ts",
-    "test:plan": "tsx test/generateBatchDeletePlanTest.ts",
     "test:batch-filters": "tsx test/test1000DocBatchFilters.ts",
     "test:batch-loop": "tsx test/runBatchProcessorLoopTest.ts",
     "test:batch-loop-non-stored": "tsx test/runNonStoredBatchProcessorTest.ts",
