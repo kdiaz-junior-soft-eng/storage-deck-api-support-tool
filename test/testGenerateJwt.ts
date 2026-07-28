@@ -1,33 +1,42 @@
-// StorageDeckAPI/test/generateJwtTest.ts
+// StorageDeckAPI/test/testGenerateJwt.ts
+import { confirm } from "@inquirer/prompts";
 import { getOrGenerateToken } from "../src/services/jwtService";
 import { env } from "../src/config/env";
 
-function testGenerateJwt() {
-  console.log("🔑 Generating JWT Bearer Token...\n");
+async function testGenerateJwt() {
+  console.log("🔍 JWT GENERATION PREVIEW");
+  console.log("==================================================================");
+  console.log(`  Subject (User)    : ${env.JWT_SUB}`);
+  console.log(`  User SRN          : ${env.JWT_USER_SRN}`);
+  console.log(`  Tenant ID         : ${env.JWT_TENANT_ID}`);
+  console.log(`  Tenant UUID       : ${env.JWT_TENANT_UUID}`);
+  console.log(`  System Name (SN)  : ${env.JWT_SN}`);
+  console.log(`  Expires In        : ${env.JWT_EXPIRES_IN}`);
+  console.log("==================================================================\n");
 
   try {
-    // 1. Generate token from environment configuration
+    // Interactive confirmation defaulting to NO / false
+    const shouldGenerate = await confirm({
+      message: "Do you want to generate the signed JWT Bearer token with these details?",
+      default: false,
+    });
+
+    if (!shouldGenerate) {
+      console.log("\n⚠️ Token generation cancelled by user.");
+      process.exit(0);
+    }
+
+    // Generate token only after explicit confirmation
+    console.log("\n🔑 Generating JWT Bearer Token...");
     const rawToken = getOrGenerateToken();
     const bearerToken = `Bearer ${rawToken}`;
 
-    // 2. Log user details sourced from environment config
-    console.log("👤 USER & TENANT CONTEXT FOR TOKEN");
-    console.log("------------------------------------------------------------------");
-    console.log(`  Subject (User)    : ${env.JWT_SUB}`);
-    console.log(`  User SRN          : ${env.JWT_USER_SRN}`);
-    console.log(`  Tenant ID         : ${env.JWT_TENANT_ID}`);
-    console.log(`  Tenant UUID       : ${env.JWT_TENANT_UUID}`);
-    console.log(`  System Name (SN)  : ${env.JWT_SN}`);
-    console.log(`  Expires In        : ${env.JWT_EXPIRES_IN}`);
-    console.log("------------------------------------------------------------------\n");
-
-    // 3. Log generated token
-    console.log("🎫 GENERATED BEARER TOKEN:");
+    console.log("\n🎫 GENERATED BEARER TOKEN:");
     console.log(bearerToken);
     console.log("\n------------------------------------------------------------------\n");
 
   } catch (error: any) {
-    console.error("❌ Token generation failed:", error.message);
+    console.error("\n❌ Token generation failed:", error.message);
     process.exit(1);
   }
 }
