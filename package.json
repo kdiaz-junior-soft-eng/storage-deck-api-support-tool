@@ -7,6 +7,7 @@
     "test:plan": "tsx test/generateBatchDeletePlanTest.ts",
     "test:batch-filters": "tsx test/test1000DocBatchFilters.ts",
     "test:batch-loop": "tsx test/runBatchProcessorLoopTest.ts",
+    "test:batch-loop-non-stored": "tsx test/runNonStoredBatchProcessorTest.ts",
     "test:active-batches": "tsx test/checkActiveProcessingBatchesTest.ts",
     "test:jwt": "tsx test/testGenerateJwt.ts",
     "test:decode": "tsx test/decodeJwtTest.ts",

@@ -2,7 +2,9 @@
 import { env } from "../config/env";
 import { 
   countDocumentsBeforeDate, 
+  countNonStoredDocumentsBeforeDate, 
   getNextBatchAfterDate, 
+  getNextBatchForNonStored, 
   StorageDeckDocument 
 } from "../database/repositories/storageDeckRepository";
 
@@ -43,7 +45,7 @@ export async function generateBatchDeletePlan(
   let batchNumber = 1;
   let lastDoc: StorageDeckDocument | undefined = undefined;
 
-  while (processedCount < totalInScope) {
+  while (true) {
     const batch: StorageDeckDocument[] = await getNextBatchAfterDate(
       batchSize,
       status,
@@ -57,6 +59,54 @@ export async function generateBatchDeletePlan(
     const windowEnd = new Date(batch[batch.length - 1].createdOn);
     
     // Add +1ms for $lt filter boundary
+    const dateFilter = new Date(windowEnd.getTime() + 1).toISOString();
+    const currentLastDoc = batch[batch.length - 1];
+
+    batches.push({
+      batchNumber,
+      count: batch.length,
+      windowStart,
+      windowEnd,
+      dateFilter,
+      lastDoc: currentLastDoc
+    });
+
+    lastDoc = currentLastDoc;
+    processedCount += batch.length;
+    batchNumber++;
+  }
+
+  return {
+    totalInScope,
+    totalBatches: batches.length,
+    totalMapped: processedCount,
+    batches
+  };
+}
+
+export async function generateFullNonStoredDeletePlan(
+  batchSize: number = 1000,
+  targetCutoffDate: Date = new Date() 
+): Promise<BatchPlanSummary> {
+  // Count total non-STORED documents up to current moment
+  const totalInScope = await countNonStoredDocumentsBeforeDate(targetCutoffDate);
+
+  if (totalInScope === 0) {
+    return { totalInScope: 0, totalBatches: 0, totalMapped: 0, batches: [] };
+  }
+
+  const batches: BatchPlanWindow[] = [];
+  let processedCount = 0;
+  let batchNumber = 1;
+  let lastDoc: StorageDeckDocument | undefined = undefined;
+
+  while (true) {
+    const batch = await getNextBatchForNonStored(batchSize, targetCutoffDate, lastDoc);
+
+    if (!batch || batch.length === 0) break;
+
+    const windowStart = new Date(batch[0].createdOn);
+    const windowEnd = new Date(batch[batch.length - 1].createdOn);
     const dateFilter = new Date(windowEnd.getTime() + 1).toISOString();
     const currentLastDoc = batch[batch.length - 1];
 

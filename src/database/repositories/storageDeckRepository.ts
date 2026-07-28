@@ -50,6 +50,23 @@ export async function countDocumentsBeforeDate(
 }
 
 /**
+ * Counts all StorageDeck documents that are NOT 'STORED' before the given date.
+ */
+export async function countNonStoredDocumentsBeforeDate(
+  dateFilter: Date
+): Promise<number> {
+  const collection = await getStorageDeckCollection();
+
+  return collection.countDocuments({
+    _class: "StorageDeck",
+    status: { $ne: "STORED" },
+    createdOn: {
+      $lt: dateFilter,
+    },
+  });
+}
+
+/**
  * Returns hourly distribution between two dates for a specific status.
  */
 export async function getHourlyCounts(
@@ -229,5 +246,44 @@ export async function getNextBatchAfterDate(
     .toArray();
 
   return documents as unknown as StorageDeckDocument[];
+}
+
+
+
+/**
+ * Helper to retrieve the next FIFO batch for non-STORED records 
+ * up to the global target Cutoff Date. Includes tie-breaker logic on `_id`.
+ */
+export async function getNextBatchForNonStored(
+  limit: number,
+  targetCutoffDate: Date,
+  lastDoc?: StorageDeckDocument
+): Promise<StorageDeckDocument[]> {
+  const collection = await getStorageDeckCollection();
+
+  // Targets both FOR_VALIDATION and DELETE_ERROR (or anything not STORED)
+  const query: Record<string, any> = {
+    _class: "StorageDeck",
+    status: { $ne: "STORED" }, // OR explicitly: status: { $in: ["FOR_VALIDATION", "DELETE_ERROR"] }
+    createdOn: { $lt: targetCutoffDate },
+  };
+
+  // Tie-breaker filtering using both createdOn AND _id
+  if (lastDoc) {
+    query.$or = [
+      { createdOn: { $gt: new Date(lastDoc.createdOn) } },
+      { 
+        createdOn: new Date(lastDoc.createdOn), 
+        _id: { $gt: lastDoc._id } 
+      },
+    ];
+  }
+
+  return collection
+    .find(query)
+    .sort({ createdOn: 1, _id: 1 })
+    .limit(limit)
+    .project({ _id: 1, createdOn: 1, status: 1 })
+    .toArray() as unknown as StorageDeckDocument[];
 }
 
