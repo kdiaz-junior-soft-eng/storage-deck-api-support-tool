@@ -9,6 +9,11 @@
     "test:active-batches": "tsx test/checkActiveProcessingBatchesTest.ts",
     "test:jwt": "tsx test/testGenerateJwt.ts",
     "test:decode": "tsx test/decodeJwtTest.ts",
+    "test:export-errors": "tsx test/exportStoredWithErrorsTest.ts",
+    "test:export-sql-filenames": "tsx test/exportFilenamesForSqlTest.ts",
+    "test:batch-store-validate": "tsx test/validateBatchStoreReadinessTest.ts",
+    "test:batch-store-plan": "tsx test/generateBatchStorePlanTest.ts",
+    "test:verify-s3": "tsx test/verifyS3FilesTest.ts",
     "verify:count": "tsx scripts/countDocumentsBeforeDate.ts"
   },
   "keywords": [],
@@ -16,6 +21,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1135.0",
     "@inquirer/prompts": "^8.5.2",
     "axios": "^1.18.1",
     "dotenv": "^17.4.2",

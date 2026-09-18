@@ -1,8 +1,22 @@
 # 🚀 StorageDeckAPI
 
-**StorageDeckAPI** is a high-performance Node.js/TypeScript service designed to safely perform deterministic, batch-driven data purges on MongoDB collections (`storage_deck_document`).
+**StorageDeckAPI** is a high-performance Node.js/TypeScript service designed to safely perform deterministic, batch-driven data operations on MongoDB collections (`storage_deck_document`).
 
 It uses **Keyset (Cursor) Pagination** with a combined compound index (`{ createdOn: 1, _id: 1 }`) to process thousands of records efficiently while safely handling live database insertions without memory overload, socket timeouts, or skipped records.
+
+---
+
+## 📚 Documentation
+
+For detailed documentation on each feature, see the [docs](./docs/README.md) folder:
+
+| Feature | Description | Command |
+|---------|-------------|---------|
+| [Batch Delete](./docs/batch-delete/README.md) | Plan batch deletions with date filters | `npm run test:batch-loop` |
+| [Batch Store](./docs/batch-store/README.md) | Plan batch store for error documents | `npm run test:batch-store-plan` |
+| [CSV Export](./docs/csv-export/README.md) | Export stored documents with errors | `npm run test:export-errors` |
+| [S3 Verification](./docs/s3-verification/README.md) | Verify files exist in S3 | `npm run test:verify-s3` |
+| [JWT Management](./docs/jwt/README.md) | Generate and decode JWT tokens | `npm run test:jwt` |
 
 ---
 

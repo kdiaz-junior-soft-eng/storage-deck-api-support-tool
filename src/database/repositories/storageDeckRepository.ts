@@ -23,6 +23,20 @@ export interface StorageDeckDocument {
   status: string;
 }
 
+export interface StorageDeckErrorMessage {
+  message?: string;
+}
+
+export interface StorageDeckFileDetail {
+  name: string;
+  recipientName: string;
+  status: string;
+  errorMessages?: StorageDeckErrorMessage[];
+  createdOn: Date;
+  s3Key?: string;
+  s3Bucket?: string;
+}
+
 /**
  * Internal helper to retrieve the typed storage_deck_document collection.
  */
@@ -287,3 +301,195 @@ export async function getNextBatchForNonStored(
     .toArray() as unknown as StorageDeckDocument[];
 }
 
+/**
+ * Retrieves documents matching source SF_ONBOARDING, status STORED,
+ * and containing non-null errorMessages.
+ */
+export async function getStorageDeckErrorDocuments(): Promise<StorageDeckFileDetail[]> {
+  const collection = await getStorageDeckCollection();
+
+  const documents = await collection
+    .find<StorageDeckFileDetail>(
+      {
+        _class: "StorageDeck",
+        source: "SF_ONBOARDING",
+        status: "STORED",
+        errorMessages: { $exists: true, $ne: null },
+      },
+      {
+        projection: {
+          _id: 0,
+          name: 1,
+          recipientName: 1,
+          status: 1,
+          "errorMessages.message": 1,
+          createdOn: 1,
+          s3Key: 1,
+          s3Bucket: 1,
+        },
+      }
+    )
+    .toArray();
+
+  return documents;
+}
+
+
+
+// ============================================================================
+// BATCH STORE REPOSITORY FUNCTIONS
+// ============================================================================
+
+/**
+ * Valid statuses for batch store operations.
+ */
+export const BATCH_STORE_STATUSES = ["ERROR", "STORE_ERROR", "FOR_VALIDATION"] as const;
+export type BatchStoreStatus = (typeof BATCH_STORE_STATUSES)[number];
+
+/**
+ * Counts all StorageDeck documents eligible for batch store (error statuses with errorMessages).
+ */
+export async function countDocumentsForBatchStore(
+  targetCutoffDate: Date,
+  statuses: readonly string[] = BATCH_STORE_STATUSES
+): Promise<number> {
+  const collection = await getStorageDeckCollection();
+
+  return collection.countDocuments({
+    _class: "StorageDeck",
+    source: "SF_ONBOARDING",
+    status: { $in: statuses },
+    errorMessages: { $exists: true, $ne: null },
+    createdOn: { $lt: targetCutoffDate },
+  });
+}
+
+/**
+ * Counts documents that are missing required fields (recipient, folder, or category).
+ * Returns 0 if all error documents have the required fields and are ready for batch store.
+ */
+export async function countDocumentsMissingRequiredFields(
+  statuses: readonly string[] = BATCH_STORE_STATUSES
+): Promise<number> {
+  const collection = await getStorageDeckCollection();
+
+  return collection.countDocuments({
+    _class: "StorageDeck",
+    source: "SF_ONBOARDING",
+    status: { $in: statuses },
+    errorMessages: { $exists: true, $ne: null },
+    $or: [
+      { recipient: { $in: [null, ""] } },
+      { folder: { $in: [null, ""] } },
+      { category: { $in: [null, ""] } },
+    ],
+  });
+}
+
+/**
+ * Retrieves documents missing required fields for inspection.
+ */
+export async function getDocumentsMissingRequiredFields(
+  limit: number = 100,
+  statuses: readonly string[] = BATCH_STORE_STATUSES
+): Promise<StorageDeckFileDetail[]> {
+  const collection = await getStorageDeckCollection();
+
+  const documents = await collection
+    .find(
+      {
+        _class: "StorageDeck",
+        source: "SF_ONBOARDING",
+        status: { $in: statuses },
+        errorMessages: { $exists: true, $ne: null },
+        $or: [
+          { recipient: { $in: [null, ""] } },
+          { folder: { $in: [null, ""] } },
+          { category: { $in: [null, ""] } },
+        ],
+      },
+      {
+        projection: {
+          _id: 0,
+          name: 1,
+          recipientName: 1,
+          status: 1,
+          recipient: 1,
+          folder: 1,
+          category: 1,
+          "errorMessages.message": 1,
+          createdOn: 1,
+        },
+      }
+    )
+    .limit(limit)
+    .toArray();
+
+  return documents as unknown as StorageDeckFileDetail[];
+}
+
+/**
+ * Retrieves the next FIFO batch of error documents for batch store planning.
+ * Includes tie-breaker logic on `_id` for deterministic ordering.
+ */
+export async function getNextBatchForStore(
+  limit: number,
+  targetCutoffDate: Date,
+  statuses: readonly string[] = BATCH_STORE_STATUSES,
+  lastDoc?: StorageDeckDocument
+): Promise<StorageDeckDocument[]> {
+  const collection = await getStorageDeckCollection();
+
+  const query: Record<string, any> = {
+    _class: "StorageDeck",
+    source: "SF_ONBOARDING",
+    status: { $in: statuses },
+    errorMessages: { $exists: true, $ne: null },
+    createdOn: { $lt: targetCutoffDate },
+  };
+
+  // Tie-breaker filtering using both createdOn AND _id
+  if (lastDoc) {
+    query.$or = [
+      { createdOn: { $gt: new Date(lastDoc.createdOn) } },
+      {
+        createdOn: new Date(lastDoc.createdOn),
+        _id: { $gt: lastDoc._id },
+      },
+    ];
+  }
+
+  const documents = await collection
+    .find(query)
+    .sort({ createdOn: 1, _id: 1 }) // Deterministic sort with tie-breaker
+    .limit(limit)
+    .project({ _id: 1, createdOn: 1, status: 1 })
+    .toArray();
+
+  return documents as unknown as StorageDeckDocument[];
+}
+
+/**
+ * Finds the exact timestamp of the Nth document for batch store cutoff.
+ */
+export async function getCutoffDateForBatchStore(
+  maxDocuments: number,
+  statuses: readonly string[] = BATCH_STORE_STATUSES
+): Promise<Date | null> {
+  const collection = await getStorageDeckCollection();
+
+  const targetDoc = await collection
+    .find({
+      _class: "StorageDeck",
+      source: "SF_ONBOARDING",
+      status: { $in: statuses },
+      errorMessages: { $exists: true, $ne: null },
+    })
+    .sort({ createdOn: 1 })
+    .skip(maxDocuments - 1)
+    .limit(1)
+    .project({ createdOn: 1 })
+    .next();
+
+  return targetDoc ? targetDoc.createdOn : null;
+}
