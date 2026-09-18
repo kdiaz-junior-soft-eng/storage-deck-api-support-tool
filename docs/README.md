@@ -56,7 +56,7 @@ Plan and execute batch deletions of StorageDeck documents by generating date-fil
 Plan batch store operations for error documents (ERROR, STORE_ERROR, FOR_VALIDATION) with pre-flight validation.
 
 ### 3. [CSV Export](./csv-export/README.md)
-Export stored documents with errors to CSV format, including S3 metadata for verification.
+Export documents with errors to CSV format with interactive status selection (STORED, STORE_ERROR, ERROR, FOR_VALIDATION). Includes error message summary with date ranges.
 
 ### 4. [S3 Verification](./s3-verification/README.md)
 Verify that files referenced in MongoDB actually exist in S3 storage.

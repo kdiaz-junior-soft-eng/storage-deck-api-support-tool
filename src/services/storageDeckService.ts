@@ -166,10 +166,11 @@ function escapeCsvValue(value: string | undefined | null): string {
  * Read-only operation - no database updates.
  */
 export async function exportStoredDocumentsWithErrorsToCsv(
-  outputDir: string = "/tmp"
+  outputDir: string = "/tmp",
+  status: string = "STORED"
 ): Promise<CsvExportResult> {
   // Fetch documents from database (read-only)
-  const documents = await getStorageDeckErrorDocuments();
+  const documents = await getStorageDeckErrorDocuments(status);
 
   // Build CSV content with all details
   const headerLine = "filename,recipient,errorMessage,createdOn,s3Key,s3Bucket";
@@ -178,9 +179,11 @@ export async function exportStoredDocumentsWithErrorsToCsv(
     const filename = escapeCsvValue(doc.name);
     const recipient = escapeCsvValue(doc.recipientName);
     const errorMessage = escapeCsvValue(
-      doc.errorMessages && doc.errorMessages.length > 0
-        ? doc.errorMessages[0].message
-        : ""
+      doc.errorMessages 
+        ? (Array.isArray(doc.errorMessages) 
+            ? doc.errorMessages[0]?.message || "No error message recorded"
+            : doc.errorMessages.message || "No error message recorded")
+        : "No error message recorded"
     );
     const createdOn = escapeCsvValue(
       doc.createdOn ? new Date(doc.createdOn).toISOString() : ""
@@ -225,10 +228,11 @@ export interface SqlFilenameExportResult {
  * Read-only operation - no database updates.
  */
 export async function exportFilenamesForSqlQuery(
-  outputDir: string = "/tmp"
+  outputDir: string = "/tmp",
+  status: string = "STORED"
 ): Promise<SqlFilenameExportResult> {
   // Fetch documents from database (read-only)
-  const documents = await getStorageDeckErrorDocuments();
+  const documents = await getStorageDeckErrorDocuments(status);
 
   // Extract filenames without extension, wrapped in quotes
   const filenames = documents.map((doc) => {
