@@ -30,6 +30,12 @@ const envSchema = z.object({
     .default("true")
     .transform((val) => val === "true"),
 
+  // AWS S3 Configuration (optional - only needed for S3 verification)
+  AWS_ACCESS_KEY_ID: z.string().optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  AWS_SESSION_TOKEN: z.string().optional(),
+  AWS_REGION: z.string().default("us-east-1"),
+
   // JWT claims (Optional at boot, but validated when needed)
   JWT_SECRET: z.string().optional(),
   JWT_SUB: z.string().optional(),
