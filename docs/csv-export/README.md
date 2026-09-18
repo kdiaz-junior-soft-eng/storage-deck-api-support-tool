@@ -1,10 +1,10 @@
 # CSV Export
 
-Export stored documents with errors to CSV format for analysis and SQL queries.
+Export documents with errors to CSV format for analysis and SQL queries.
 
 ## Overview
 
-This feature extracts documents from MongoDB that are marked as STORED but contain error messages, exporting them to CSV files for further analysis or use in SQL queries.
+This feature extracts documents from MongoDB based on selected status (STORED, STORE_ERROR, ERROR, FOR_VALIDATION), exporting them to CSV files for further analysis or use in SQL queries.
 
 ## Commands
 
@@ -14,6 +14,16 @@ npm run test:export-errors
 
 # Export only filenames (quoted, without extension) for SQL queries
 npm run test:export-sql-filenames
+```
+
+Both commands provide an interactive CLI to select the document status:
+
+```
+? Select document status to export:
+❯ STORED
+  STORE_ERROR
+  ERROR
+  FOR_VALIDATION
 ```
 
 ## Output Location
@@ -30,8 +40,10 @@ Files are timestamped to avoid overwriting:
 
 ```csv
 filename,recipient,errorMessage,createdOn,s3Key,s3Bucket
-"SeibeDan_I9_SECTION1_2025_V1_signed_20260106025633.pdf","Daniel Seibel","","2026-08-05T20:35:44.458Z","nucor_prd_paDRed/prd_nucor_prd/40e7870c-b0ee-413c-a46d-0de51cc62510","381492120424-ore-sto-shr-prd-s3-stodeck"
+"SeibeDan_I9_SECTION1_2025_V1_signed_20260106025633.pdf","Daniel Seibel","Connection has been closed BEFORE response","2026-08-05T20:35:44.458Z","nucor_prd_paDRed/...","381492120424-ore-sto-shr-prd-s3-stodeck"
 ```
+
+Documents without error messages will show: `"No error message recorded"`
 
 ### SQL Filenames (`test:export-sql-filenames`)
 
@@ -64,20 +76,23 @@ Exports target documents matching:
 {
   _class: "StorageDeck",
   source: "SF_ONBOARDING",
-  status: "STORED",
-  errorMessages: { $exists: true, $ne: null }
+  status: "<selected_status>"  // STORED, STORE_ERROR, ERROR, or FOR_VALIDATION
 }
 ```
+
+Note: Error messages filter is optional — documents without `errorMessages` are included.
 
 ## Output Example
 
 ```
-🚀 Testing CSV Export for Stored Documents with Errors...
+🚀 CSV Export for Documents with Errors...
+
+? Select document status to export: STORE_ERROR
 
 📋 Query Criteria:
    - _class: StorageDeck
    - source: SF_ONBOARDING
-   - status: STORED
+   - status: STORE_ERROR
    - errorMessages: exists and not null
 
 📁 Output Directory: /path/to/exports
@@ -86,17 +101,37 @@ Exports target documents matching:
 ---------------------------------------------------
 📊 EXPORT SUMMARY
 ---------------------------------------------------
+Status Exported        : STORE_ERROR
 Total Records Exported : 1,145
-Output File Path       : /path/to/exports/stored_with_errors_2026-09-18T09-33-09-571Z.csv
+Output File Path       : /path/to/exports/stored_with_errors_2026-09-18T11-52-48-670Z.csv
 
+---------------------------------------------------
+📈 ERROR MESSAGE SUMMARY
+---------------------------------------------------
+Unique Error Types : 3
+Overall Date Range : 2026-07-29 ➔ 2026-09-17
+
+[1] 800 files (69.9%)
+    Error : "Upload failed with status 502 BAD_GATEWAY"
+    Period: 2026-07-29 ➔ 2026-08-25
+
+[2] 300 files (26.2%)
+    Error : "Connection has been closed BEFORE response, while sending request body"
+    Period: 2026-08-01 ➔ 2026-09-15
+
+[3] 45 files (3.9%)
+    Error : "No error message recorded"
+    Period: 2026-09-10 ➔ 2026-09-17
+
+---------------------------------------------------
 📄 Sample Data (First 5 Records):
 ---------------------------------------------------
 
-[1] SeibeDan_I9_SECTION1_2025_V1_signed_20260106025633.pdf
-    Recipient    : Daniel Seibel
-    Status       : STORED
-    Error Message: (none)
-    Created On   : 2026-08-05T20:35:44.458Z
+[1] PriceKay_US_NC_4_2025_V1_signed_20260908173916.pdf
+    Recipient    : Kayla Price
+    Status       : STORE_ERROR
+    Error Message: Connection has been closed BEFORE response, while sending request body
+    Created On   : 2026-09-17T04:37:44.609Z
 
 ... and 1140 more records
 
@@ -107,5 +142,5 @@ Output File Path       : /path/to/exports/stored_with_errors_2026-09-18T09-33-09
 
 - `src/services/storageDeckService.ts` - `exportStoredDocumentsWithErrorsToCsv()`, `exportFilenamesForSqlQuery()`
 - `src/database/repositories/storageDeckRepository.ts` - `getStorageDeckErrorDocuments()`
-- `test/exportStoredWithErrorsTest.ts` - Full CSV export script
-- `test/exportFilenamesForSqlTest.ts` - SQL filenames export script
+- `test/exportStoredWithErrorsTest.ts` - Full CSV export script with CLI
+- `test/exportFilenamesForSqlTest.ts` - SQL filenames export script with CLI

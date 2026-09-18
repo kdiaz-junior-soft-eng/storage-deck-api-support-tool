@@ -1,28 +1,44 @@
 // StorageDeckAPI/test/exportFilenamesForSqlTest.ts
 import * as path from "path";
+import { select } from "@inquirer/prompts";
 import { exportFilenamesForSqlQuery } from "../src/services/storageDeckService";
+
+const STATUS_OPTIONS = [
+  { name: "STORED", value: "STORED", description: "Successfully stored documents with errors" },
+  { name: "STORE_ERROR", value: "STORE_ERROR", description: "Documents that failed to store" },
+  { name: "ERROR", value: "ERROR", description: "Documents with general errors" },
+  { name: "FOR_VALIDATION", value: "FOR_VALIDATION", description: "Documents pending validation" },
+];
 
 async function testExportFilenamesForSql() {
   console.log("🚀 Exporting Filenames for SQL Query...\n");
-  console.log("📋 Query Criteria:");
-  console.log("   - _class: StorageDeck");
-  console.log("   - source: SF_ONBOARDING");
-  console.log("   - status: STORED");
-  console.log("   - errorMessages: exists and not null\n");
 
   try {
+    // CLI status selection
+    const selectedStatus = await select({
+      message: "Select document status to export:",
+      choices: STATUS_OPTIONS,
+    });
+
+    console.log(`\n📋 Query Criteria:`);
+    console.log(`   - _class: StorageDeck`);
+    console.log(`   - source: SF_ONBOARDING`);
+    console.log(`   - status: ${selectedStatus}`);
+    console.log(`   - errorMessages: exists and not null\n`);
+
     const outputDir = path.resolve(__dirname, "../exports");
 
     console.log(`📁 Output Directory: ${outputDir}`);
     console.time("⏱️  Export Duration");
 
-    const result = await exportFilenamesForSqlQuery(outputDir);
+    const result = await exportFilenamesForSqlQuery(outputDir, selectedStatus);
 
     console.timeEnd("⏱️  Export Duration");
 
     console.log("\n---------------------------------------------------");
     console.log("📊 EXPORT SUMMARY");
     console.log("---------------------------------------------------");
+    console.log(`Status Exported          : ${selectedStatus}`);
     console.log(`Total Filenames Exported : ${result.recordCount}`);
     console.log(`Output File Path         : ${result.filePath}`);
 

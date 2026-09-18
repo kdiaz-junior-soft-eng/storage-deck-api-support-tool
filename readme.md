@@ -14,7 +14,7 @@ For detailed documentation on each feature, see the [docs](./docs/README.md) fol
 |---------|-------------|---------|
 | [Batch Delete](./docs/batch-delete/README.md) | Plan batch deletions with date filters | `npm run test:batch-loop` |
 | [Batch Store](./docs/batch-store/README.md) | Plan batch store for error documents | `npm run test:batch-store-plan` |
-| [CSV Export](./docs/csv-export/README.md) | Export stored documents with errors | `npm run test:export-errors` |
+| [CSV Export](./docs/csv-export/README.md) | Export documents with errors to CSV (interactive status selection) | `npm run test:export-errors` |
 | [S3 Verification](./docs/s3-verification/README.md) | Verify files exist in S3 | `npm run test:verify-s3` |
 | [JWT Management](./docs/jwt/README.md) | Generate and decode JWT tokens | `npm run test:jwt` |
 

@@ -31,7 +31,7 @@ export interface StorageDeckFileDetail {
   name: string;
   recipientName: string;
   status: string;
-  errorMessages?: StorageDeckErrorMessage[];
+  errorMessages?: StorageDeckErrorMessage | StorageDeckErrorMessage[];
   createdOn: Date;
   s3Key?: string;
   s3Bucket?: string;
@@ -302,20 +302,29 @@ export async function getNextBatchForNonStored(
 }
 
 /**
- * Retrieves documents matching source SF_ONBOARDING, status STORED,
- * and containing non-null errorMessages.
+ * Retrieves documents matching source SF_ONBOARDING with specified status.
+ * Error messages filter is optional - returns all documents with the status.
  */
-export async function getStorageDeckErrorDocuments(): Promise<StorageDeckFileDetail[]> {
+export async function getStorageDeckErrorDocuments(
+  status: string = "STORED",
+  requireErrorMessages: boolean = false
+): Promise<StorageDeckFileDetail[]> {
   const collection = await getStorageDeckCollection();
+
+  const query: Record<string, any> = {
+    _class: "StorageDeck",
+    source: "SF_ONBOARDING",
+    status: status,
+  };
+
+  // Only add errorMessages filter if required
+  if (requireErrorMessages) {
+    query.errorMessages = { $exists: true, $ne: null };
+  }
 
   const documents = await collection
     .find<StorageDeckFileDetail>(
-      {
-        _class: "StorageDeck",
-        source: "SF_ONBOARDING",
-        status: "STORED",
-        errorMessages: { $exists: true, $ne: null },
-      },
+      query,
       {
         projection: {
           _id: 0,
