@@ -1,10 +1,10 @@
 # CSV Export
 
-Export documents with errors to CSV format for analysis and SQL queries.
+Export documents to CSV format for analysis and SQL queries.
 
 ## Overview
 
-This feature extracts documents from MongoDB based on selected status (STORED, STORE_ERROR, ERROR, FOR_VALIDATION), exporting them to CSV files for further analysis or use in SQL queries.
+This feature extracts documents from MongoDB based on selected status and source, exporting them to CSV files for further analysis or use in SQL queries.
 
 ## Commands
 
@@ -16,14 +16,43 @@ npm run test:export-errors
 npm run test:export-sql-filenames
 ```
 
-Both commands provide an interactive CLI to select the document status:
+## Interactive CLI
+
+Both commands feature an interactive CLI that lets you select:
+
+1. **Status** - Dynamically fetched from the database with document counts:
+   - **All Processable** - All statuses except `STORED` and any `*PROCESSING*` statuses
+   - Individual statuses with their counts (e.g., `STORE_ERROR (1,234 docs)`)
+   - 🔒 Locked statuses are marked but still selectable
+
+2. **Source** - Dynamically fetched from the database:
+   - **All Sources** - Include all sources (no source filter)
+   - Or select a specific source (e.g., `SF_ONBOARDING`, `SF_OFFBOARDING`)
+
+### CLI Example
 
 ```
+🚀 CSV Export for Documents with Errors...
+
+📡 Fetching available sources from database...
+   Found 3 source(s): SF_ONBOARDING, SF_OFFBOARDING, SF_REHIRE
+📡 Fetching available statuses from database...
+   Found 3 status(es):
+   🔒 STORED: 195
+      FOR_VALIDATION: 25
+      STORE_ERROR: 2
+
 ? Select document status to export:
-❯ STORED
-  STORE_ERROR
-  ERROR
-  FOR_VALIDATION
+❯ All Processable (27 docs)
+  STORED (195 docs)
+  FOR_VALIDATION (25 docs)
+  STORE_ERROR (2 docs)
+
+? Select document source:
+❯ All Sources
+  SF_ONBOARDING
+  SF_OFFBOARDING
+  SF_REHIRE
 ```
 
 ## Output Location
@@ -70,30 +99,43 @@ WHERE sf.recordStatus = "ACTIVE" AND sf.ID IN (
 
 ## MongoDB Query
 
-Exports target documents matching:
+Exports target documents based on your selections:
 
 ```javascript
+// When "All Processable" status is selected with "All Sources"
+{
+  _class: "StorageDeck",
+  status: { $not: /^STORED$|PROCESSING/ }  // Excludes STORED and *PROCESSING*
+}
+
+// When specific status with specific source
 {
   _class: "StorageDeck",
   source: "SF_ONBOARDING",
-  status: "<selected_status>"  // STORED, STORE_ERROR, ERROR, or FOR_VALIDATION
+  status: "STORE_ERROR"
 }
 ```
-
-Note: Error messages filter is optional — documents without `errorMessages` are included.
 
 ## Output Example
 
 ```
 🚀 CSV Export for Documents with Errors...
 
-? Select document status to export: STORE_ERROR
+📡 Fetching available sources from database...
+   Found 3 source(s): SF_ONBOARDING, SF_OFFBOARDING, SF_REHIRE
+📡 Fetching available statuses from database...
+   Found 3 status(es):
+   🔒 STORED: 195
+      FOR_VALIDATION: 25
+      STORE_ERROR: 2
+
+? Select document status to export: STORE_ERROR (2 docs)
+? Select document source: All Sources
 
 📋 Query Criteria:
    - _class: StorageDeck
-   - source: SF_ONBOARDING
+   - source: (all sources)
    - status: STORE_ERROR
-   - errorMessages: exists and not null
 
 📁 Output Directory: /path/to/exports
 ⏱️  Export Duration: 1.23s
@@ -102,26 +144,19 @@ Note: Error messages filter is optional — documents without `errorMessages` ar
 📊 EXPORT SUMMARY
 ---------------------------------------------------
 Status Exported        : STORE_ERROR
-Total Records Exported : 1,145
+Source Exported        : (all sources)
+Total Records Exported : 2
 Output File Path       : /path/to/exports/stored_with_errors_2026-09-18T11-52-48-670Z.csv
 
 ---------------------------------------------------
 📈 ERROR MESSAGE SUMMARY
 ---------------------------------------------------
-Unique Error Types : 3
-Overall Date Range : 2026-07-29 ➔ 2026-09-17
+Unique Error Types : 1
+Overall Date Range : 2026-09-17 ➔ 2026-09-17
 
-[1] 800 files (69.9%)
-    Error : "Upload failed with status 502 BAD_GATEWAY"
-    Period: 2026-07-29 ➔ 2026-08-25
-
-[2] 300 files (26.2%)
+[1] 2 files (100.0%)
     Error : "Connection has been closed BEFORE response, while sending request body"
-    Period: 2026-08-01 ➔ 2026-09-15
-
-[3] 45 files (3.9%)
-    Error : "No error message recorded"
-    Period: 2026-09-10 ➔ 2026-09-17
+    Period: 2026-09-17
 
 ---------------------------------------------------
 📄 Sample Data (First 5 Records):
@@ -133,14 +168,12 @@ Overall Date Range : 2026-07-29 ➔ 2026-09-17
     Error Message: Connection has been closed BEFORE response, while sending request body
     Created On   : 2026-09-17T04:37:44.609Z
 
-... and 1140 more records
-
 ✅ CSV export completed successfully!
 ```
 
 ## Related Files
 
 - `src/services/storageDeckService.ts` - `exportStoredDocumentsWithErrorsToCsv()`, `exportFilenamesForSqlQuery()`
-- `src/database/repositories/storageDeckRepository.ts` - `getStorageDeckErrorDocuments()`
+- `src/database/repositories/storageDeckRepository.ts` - `getStorageDeckErrorDocuments()`, `getDistinctSources()`, `getDistinctStatusesWithCounts()`
 - `test/exportStoredWithErrorsTest.ts` - Full CSV export script with CLI
 - `test/exportFilenamesForSqlTest.ts` - SQL filenames export script with CLI

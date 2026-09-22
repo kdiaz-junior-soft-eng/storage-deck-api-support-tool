@@ -12,7 +12,6 @@ import {
   countDocumentsMissingRequiredFields,
   getDocumentsMissingRequiredFields,
   getNextBatchForStore,
-  BATCH_STORE_STATUSES,
   StorageDeckDocument,
   StorageDeckFileDetail
 } from "../database/repositories/storageDeckRepository";
@@ -167,10 +166,11 @@ function escapeCsvValue(value: string | undefined | null): string {
  */
 export async function exportStoredDocumentsWithErrorsToCsv(
   outputDir: string = "/tmp",
-  status: string = "STORED"
+  status: string = "STORED",
+  source?: string
 ): Promise<CsvExportResult> {
   // Fetch documents from database (read-only)
-  const documents = await getStorageDeckErrorDocuments(status);
+  const documents = await getStorageDeckErrorDocuments(status, source);
 
   // Build CSV content with all details
   const headerLine = "filename,recipient,errorMessage,createdOn,s3Key,s3Bucket";
@@ -229,10 +229,11 @@ export interface SqlFilenameExportResult {
  */
 export async function exportFilenamesForSqlQuery(
   outputDir: string = "/tmp",
-  status: string = "STORED"
+  status: string = "STORED",
+  source?: string
 ): Promise<SqlFilenameExportResult> {
   // Fetch documents from database (read-only)
-  const documents = await getStorageDeckErrorDocuments(status);
+  const documents = await getStorageDeckErrorDocuments(status, source);
 
   // Extract filenames without extension, wrapped in quotes
   const filenames = documents.map((doc) => {
@@ -284,14 +285,16 @@ export interface BatchStoreValidationResult {
 }
 
 /**
- * Generates a batch store plan for error documents, similar to batch delete plan.
- * Targets documents with status ERROR, STORE_ERROR, or FOR_VALIDATION.
+ * Generates a batch store plan for documents, similar to batch delete plan.
+ * Only includes errorMessages filter if status contains "ERROR".
  */
 export async function generateBatchStorePlan(
   batchSize: number = 1000,
-  targetCutoffDate: Date = new Date()
+  targetCutoffDate: Date = new Date(),
+  status: string = "STORE_ERROR",
+  source: string = "SF_ONBOARDING"
 ): Promise<BatchStorePlanSummary> {
-  const totalInScope = await countDocumentsForBatchStore(targetCutoffDate);
+  const totalInScope = await countDocumentsForBatchStore(targetCutoffDate, status, source);
 
   if (totalInScope === 0) {
     return {
@@ -311,7 +314,8 @@ export async function generateBatchStorePlan(
     const batch = await getNextBatchForStore(
       batchSize,
       targetCutoffDate,
-      BATCH_STORE_STATUSES,
+      status,
+      source,
       lastDoc
     );
 
@@ -347,23 +351,26 @@ export async function generateBatchStorePlan(
 }
 
 /**
- * Validates that all error documents have required fields before batch store.
+ * Validates that all documents have required fields before batch store.
  * Checks recipient, folder, and category fields.
  * Returns validation result with details about any missing fields.
  */
-export async function validateBatchStoreReadiness(): Promise<BatchStoreValidationResult> {
-  const totalErrorDocuments = await countDocumentsForBatchStore(new Date());
-  const documentsMissingFields = await countDocumentsMissingRequiredFields();
+export async function validateBatchStoreReadiness(
+  status: string = "STORE_ERROR",
+  source: string = "SF_ONBOARDING"
+): Promise<BatchStoreValidationResult> {
+  const totalErrorDocuments = await countDocumentsForBatchStore(new Date(), status, source);
+  const documentsMissingFields = await countDocumentsMissingRequiredFields(status, source);
 
   const isValid = documentsMissingFields === 0;
 
   let missingFieldsSample: StorageDeckFileDetail[] = [];
   if (!isValid) {
-    missingFieldsSample = await getDocumentsMissingRequiredFields(10);
+    missingFieldsSample = await getDocumentsMissingRequiredFields(10, status, source);
   }
 
   const message = isValid
-    ? `✅ All ${totalErrorDocuments} error documents have required fields. Ready for batch store.`
+    ? `✅ All ${totalErrorDocuments} documents have required fields. Ready for batch store.`
     : `❌ ${documentsMissingFields} of ${totalErrorDocuments} documents are missing required fields (recipient, folder, or category).`;
 
   return {

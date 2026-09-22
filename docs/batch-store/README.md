@@ -43,18 +43,60 @@ npm run test:batch-store-plan
 
 This creates date-filtered batches similar to batch delete, ready for execution.
 
+## Interactive CLI
+
+Both commands feature an interactive CLI that lets you:
+
+1. **Select Status** - Dynamically fetched from the database with document counts:
+   - **All Processable** - All statuses except `STORED` and any `*PROCESSING*` statuses
+   - Individual statuses like `STORE_ERROR`, `FOR_VALIDATION`, `ERROR`, etc.
+   - 🔒 Locked statuses (`STORED`, `*PROCESSING*`) are marked but still selectable for viewing
+
+2. **Select Source** - Dynamically fetched from the database:
+   - **All Sources** - Include all sources (no source filter)
+   - Or select a specific source (e.g., `SF_ONBOARDING`, `SF_OFFBOARDING`)
+
 ## Target Documents
 
-Batch store targets documents with:
+Batch store targets documents based on CLI selections:
 
 ```javascript
+// Example: All Processable with All Sources
+// Excludes STORED and any status containing "PROCESSING"
+{
+  _class: "StorageDeck",
+  status: { $not: /^STORED$|PROCESSING/ }
+}
+
+// Example: STORE_ERROR with specific source
 {
   _class: "StorageDeck",
   source: "SF_ONBOARDING",
-  status: { $in: ["ERROR", "STORE_ERROR", "FOR_VALIDATION"] },
-  errorMessages: { $exists: true, $ne: null }
+  status: "STORE_ERROR",
+  errorMessages: { $exists: true, $ne: null }  // Only when status contains "ERROR"
 }
 ```
+
+## ⚠️ Important: How the Batch Store API Actually Works
+
+**The batch store API processes ALL documents before the dateFilter that are NOT in STORED or *PROCESSING* status — regardless of the status you selected in this planning tool.**
+
+### Example Scenario
+
+If you have:
+- 20 `STORE_ERROR` documents before the dateFilter
+- 80 `FOR_VALIDATION` documents before the dateFilter
+
+And you selected only `FOR_VALIDATION` (showing 80 docs in the plan), the API will actually process **ALL 100 documents** (20 + 80).
+
+### Why This Matters
+
+The status filter in this tool is for **PLANNING purposes only** — to help you:
+- Understand the document breakdown by status
+- Calculate appropriate date windows
+- Estimate batch sizes
+
+**To see the true count of documents that will be processed by the API, use the "All Processable" option.**
 
 ## Configuration
 
@@ -65,67 +107,91 @@ MAX_DOCUMENTS_PER_BATCH=15000
 
 ## Output Example
 
-### Validation Output
+### CLI Status Display
 
 ```
-🚀 Validating Batch Store Readiness...
+📡 Fetching available statuses from database...
+   Found 5 status(es):
+   🔒 STORED: 50,000
+      STORE_ERROR: 1,234
+      ERROR: 567
+      FOR_VALIDATION: 89
+   🔒 PROCESSING: 12
 
-📋 Checking documents with:
-   - _class: StorageDeck
-   - source: SF_ONBOARDING
-   - status: ERROR, STORE_ERROR, or FOR_VALIDATION
-   - errorMessages: exists and not null
-
-🔍 Validating required fields: recipient, folder, category
-
----------------------------------------------------
-📊 VALIDATION RESULT
----------------------------------------------------
-Status                    : ✅ READY
-Total Error Documents     : 1,234
-Missing Required Fields   : 0
-
-✅ All 1234 error documents have required fields. Ready for batch store.
+? Select document status:
+❯ All Processable (1,890 docs)
+  STORED (50,000 docs)
+  STORE_ERROR (1,234 docs)
+  ERROR (567 docs)
+  FOR_VALIDATION (89 docs)
+  PROCESSING (12 docs)
 ```
 
 ### Batch Plan Output
 
 ```
-🔄 Starting Full Batch Store Window Mapping Test...
+🔄 Batch Store Plan Generator
+
+📡 Fetching available sources from database...
+   Found 3 source(s): SF_ONBOARDING, SF_OFFBOARDING, SF_REHIRE
+📡 Fetching available statuses from database...
+   Found 3 status(es):
+   🔒 STORED: 195
+      FOR_VALIDATION: 25
+      STORE_ERROR: 2
+
+? Select document status: All Processable (27 docs)
+? Select document source: All Sources
+
+📋 Query Criteria:
+   - _class: StorageDeck
+   - source: (all sources)
+   - status: (all except STORED & PROCESSING)
 
 Global Target Date : 2026-09-18T09:20:24.599Z
-Target Statuses    : ERROR, STORE_ERROR, FOR_VALIDATION
 Batch Limit        : 15,000
 
 ---------------------------------------------------
 🔍 PRE-FLIGHT VALIDATION
 ---------------------------------------------------
 
-✅ All 1234 error documents have required fields. Ready for batch store.
+✅ All 27 documents have required fields. Ready for batch store.
 
 ✅ Batch mapping calculation complete!
 
-📊 Total matching documents in scope: 1,234
+📊 Total matching documents in scope: 27
 
 ------------------------------------------------------------------------------------------------------------------
-🚀 MAPPING BATCH DATE FILTERS FOR API PAYLOAD
+📝 CURL COMMAND TEMPLATE
 ------------------------------------------------------------------------------------------------------------------
 
-📦 Batch #001 | Docs: 1234 | Window: 2026-08-01T... ➔ 2026-08-15T... | dateFilter: 2026-08-15T...
+curl -X POST 'https://<host>/storage/deck/storequeue/batchstore' \
+  -H 'Authorization: Bearer <JWT_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "recipientId": "",
+    "folderId": "",
+    "categoryId": "",
+    "dateFilter": "2026-08-15T...",
+    "keyword": "",
+    "language": "en"
+  }'
 
 ------------------------------------------------------------------------------------------------------------------
-🏁 FULL QUEUE MAPPING COMPLETE
+⚠️  IMPORTANT: HOW THE BATCH STORE API ACTUALLY WORKS
 ------------------------------------------------------------------------------------------------------------------
-Total Batches Required   : 1
-Total Documents Mapped   : 1,234 / 1,234
-Execution Duration       : 0.21s
 
-✅ SUCCESS: All dateFilters mapped cleanly for batch store execution!
+The batch store API processes ALL documents before the dateFilter that are NOT in
+STORED or *PROCESSING* status — regardless of the status you selected above.
+
+📌 To process ONLY specific statuses, use the 'All Processable' option to see
+   the true count of documents that will be processed by the API.
+------------------------------------------------------------------------------------------------------------------
 ```
 
 ## Related Files
 
 - `src/services/storageDeckService.ts` - `generateBatchStorePlan()`, `validateBatchStoreReadiness()`
-- `src/database/repositories/storageDeckRepository.ts` - `countDocumentsForBatchStore()`, `countDocumentsMissingRequiredFields()`, `getNextBatchForStore()`
+- `src/database/repositories/storageDeckRepository.ts` - `countDocumentsForBatchStore()`, `countDocumentsMissingRequiredFields()`, `getNextBatchForStore()`, `getDistinctSources()`, `getDistinctStatusesWithCounts()`
 - `test/validateBatchStoreReadinessTest.ts` - Validation test script
 - `test/generateBatchStorePlanTest.ts` - Batch plan generation script

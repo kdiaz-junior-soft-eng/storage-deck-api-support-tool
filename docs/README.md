@@ -12,7 +12,7 @@ docs/
 ├── batch-store/
 │   └── README.md               # Batch store planning & validation
 ├── csv-export/
-│   └── README.md               # CSV export for stored documents with errors
+│   └── README.md               # CSV export for documents
 ├── s3-verification/
 │   └── README.md               # S3 file existence verification
 └── jwt/
@@ -41,7 +41,7 @@ docs/
 | `npm run test:batch-loop-non-stored` | Generate batch delete plan for non-STORED documents |
 | `npm run test:batch-store-validate` | Validate documents before batch store |
 | `npm run test:batch-store-plan` | Generate batch store plan for error documents |
-| `npm run test:export-errors` | Export stored documents with errors to CSV |
+| `npm run test:export-errors` | Export documents to CSV |
 | `npm run test:export-sql-filenames` | Export filenames for SQL queries |
 | `npm run test:verify-s3` | Verify files exist in S3 |
 | `npm run test:jwt` | Generate JWT token |
@@ -53,10 +53,16 @@ docs/
 Plan and execute batch deletions of StorageDeck documents by generating date-filtered batches.
 
 ### 2. [Batch Store](./batch-store/README.md)
-Plan batch store operations for error documents (ERROR, STORE_ERROR, FOR_VALIDATION) with pre-flight validation.
+Plan batch store operations with pre-flight validation. Features:
+- Dynamic status fetching from database with document counts
+- Dynamic source selection
+- Warning about API behavior (processes ALL non-stored documents up to dateFilter)
 
 ### 3. [CSV Export](./csv-export/README.md)
-Export documents with errors to CSV format with interactive status selection (STORED, STORE_ERROR, ERROR, FOR_VALIDATION). Includes error message summary with date ranges.
+Export documents to CSV format. Features:
+- Interactive CLI with dynamic status and source selection
+- Error message summary with date ranges
+- Separate SQL filename export for database queries
 
 ### 4. [S3 Verification](./s3-verification/README.md)
 Verify that files referenced in MongoDB actually exist in S3 storage.
